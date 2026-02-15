@@ -59,9 +59,9 @@ def is_binary(string: str) -> bool:
     Returns:
         ``True`` if the given string is a binary operator, ``False`` otherwise.
     """
-    return string == '&' or string == '|' or string == '->'
+    # return string == '&' or string == '|' or string == '->'
     # For Chapter 3:
-    # return string in {'&', '|',  '->', '+', '<->', '-&', '-|'}
+    return string in {'&', '|', '->', '+', '<->', '-&', '-|'}
 
 @frozen
 class Formula:
@@ -314,23 +314,25 @@ class Formula:
                     return None, remainder
                 return Formula(s[0], formula), remainder
 
-            operator = None
-            if len(s) >= 2 and is_binary(s[:2]):
-                operator = s[:2]
-                remainder = s[2:]
-            elif is_binary(s[0]):
-                operator = s[0]
-                remainder = s[1:]
-            else:
+            op = None
+            rem = ''
+            max_len = min(3, len(s))
+            for ln in range(max_len, 0, -1):
+                c = s[:ln]
+                if is_binary(c):
+                    op = c
+                    rem = s[ln:]
+                    break
+            if op is None:
                 return None, 'Invalid formula'
 
-            first, remainder = parse_prefix(remainder)
+            first, rem = parse_prefix(rem)
             if first is None:
-                return None, remainder
-            second, remainder = parse_prefix(remainder)
+                return None, rem
+            second, rem = parse_prefix(rem)
             if second is None:
-                return None, remainder
-            return Formula(operator, first, second), remainder
+                return None, rem
+            return Formula(op, first, second), rem
 
         formula, remainder = parse_prefix(string)
         assert formula is not None and remainder == ''
@@ -360,6 +362,21 @@ class Formula:
         for variable in substitution_map:
             assert is_variable(variable)
         # Task 3.3
+        if is_variable(self.root):
+            if self.root in substitution_map:
+                return substitution_map[self.root]
+            return Formula(self.root)
+
+        if is_constant(self.root):
+            return Formula(self.root)
+
+        if is_unary(self.root):
+            f1 = self.first.substitute_variables(substitution_map)
+            return Formula(self.root, f1)
+
+        f1 = self.first.substitute_variables(substitution_map)
+        f2 = self.second.substitute_variables(substitution_map)
+        return Formula(self.root, f1, f2)
 
     def substitute_operators(self, substitution_map: Mapping[str, Formula]) -> \
             Formula:
@@ -390,3 +407,24 @@ class Formula:
                    is_binary(operator)
             assert substitution_map[operator].variables().issubset({'p', 'q'})
         # Task 3.4
+        if is_variable(self.root):
+            return Formula(self.root)
+
+        if is_constant(self.root):
+            if self.root in substitution_map:
+                return substitution_map[self.root]
+            return Formula(self.root)
+
+        if is_unary(self.root):
+            f1 = self.first.substitute_operators(substitution_map)
+            if self.root in substitution_map:
+                mp = {'p': f1}
+                return substitution_map[self.root].substitute_variables(mp)
+            return Formula(self.root, f1)
+
+        f1 = self.first.substitute_operators(substitution_map)
+        f2 = self.second.substitute_operators(substitution_map)
+        if self.root in substitution_map:
+            mp = {'p': f1, 'q': f2}
+            return substitution_map[self.root].substitute_variables(mp)
+        return Formula(self.root, f1, f2)
